@@ -37,3 +37,20 @@ sonarqube(
     targets = [],
     testonly = True,
 )
+
+sonarqube(
+    name = "sonarqube2",
+    # need to use different files 
+    sq_properties = "project2-sonar-project.properties",
+    srcs = [],
+    coverage_report = ":coverage_report",
+    modules = {
+        "//subproject2:sq_subproject": "subproject2",
+    },
+    project_key = "com.example.project:project2",
+    project_name = "My Second Project",
+    scm_info = [":git"],
+    tags = ["manual"],
+    targets = [],
+    testonly = True,
+)

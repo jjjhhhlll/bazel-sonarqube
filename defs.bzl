@@ -125,7 +125,7 @@ def _test_report_path(parent_path, test_target):
     return parent_path + "bazel-testlogs/" + test_target.package + "/" + test_target.name
 
 def _sonarqube_impl(ctx):
-    sq_properties_file = ctx.actions.declare_file("sonar-project.properties")
+    sq_properties_file = ctx.actions.declare_file(ctx.attr.sq_properties)
 
     local_runfiles = _build_sonar_project_properties(ctx, sq_properties_file)
 
@@ -161,7 +161,6 @@ _COMMON_ATTRS = dict(dict(), **{
     "test_targets": attr.label_list(default = [], aspects = [ test_targets_aspect ]),
     "test_reports": attr.label_list(allow_files = True, default = []),
     "sq_properties_template": attr.label(allow_single_file = True, default = "@bazel_sonarqube//:sonar-project.properties.tpl"),
-    "sq_properties": attr.output(),
 })
 
 _sonarqube = rule(
@@ -169,6 +168,7 @@ _sonarqube = rule(
         "coverage_report": attr.label(allow_single_file = True, mandatory = False),
         "scm_info": attr.label_list(allow_files = True),
         "sonar_scanner": attr.label(executable = True, default = "@bazel_sonarqube//:sonar_scanner", cfg = "host"),
+        "sq_properties": attr.string(default='sonar-project.properties'),
     }),
     fragments = ["jvm"],
     host_fragments = ["jvm"],
@@ -191,6 +191,7 @@ def sonarqube(
         modules = {},
         sonar_scanner = "@bazel_sonarqube//:sonar_scanner",
         sq_properties_template = "@bazel_sonarqube//:sonar-project.properties.tpl",
+        sq_properties = 'sonar-project.properties',
         tags = [],
         visibility = [],
         **kwargs):
@@ -239,6 +240,7 @@ def sonarqube(
             coverage` before running the `sonarqube` target.
         sonar_scanner: Bazel binary target to execute the SonarQube CLI Scanner.
         sq_properties_template: Template file for `sonar-project.properties`.
+        sq_properties: Filename to use instead of `sonar-project.properties`.
         tags: Bazel target tags, e.g. `["manual"]`.
         visibility: Bazel target visibility, e.g. `["//visibility:public"]`.
     """
@@ -257,21 +259,26 @@ def sonarqube(
         coverage_report = coverage_report,
         sonar_scanner = sonar_scanner,
         sq_properties_template = sq_properties_template,
-        sq_properties = "sonar-project.properties",
+        sq_properties = sq_properties,
         tags = tags,
         visibility = visibility,
         **kwargs,
     )
 
 def _sq_project_impl(ctx):
-    local_runfiles = _build_sonar_project_properties(ctx, ctx.outputs.sq_properties)
+    # note: sq_project doesn't support changing sonar-project.properties
+    # sonar won't find the modules without this name.
+    sq_properties_file = ctx.outputs.sq_properties
+    local_runfiles = _build_sonar_project_properties(ctx, sq_properties_file)
 
     return [DefaultInfo(
         runfiles = local_runfiles,
     )]
 
 _sq_project = rule(
-    attrs = _COMMON_ATTRS,
+    attrs = dict(_COMMON_ATTRS, **{
+        'sq_properties': attr.output(),
+    }),
     implementation = _sq_project_impl,
 )
 
